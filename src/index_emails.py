@@ -51,34 +51,31 @@ def delete_index():
 def create_index():
 
     schema = {
-        "settings": {
-            "number_of_shards": tornado.options.options.num_of_shards,
-            "number_of_replicas": 0
-        },
-        "mappings": {
-            "email": {
-                "_source": {"enabled": True},
-                "properties": {
-                    "from": {"type": "string", "index": "not_analyzed"},
-                    "return-path": {"type": "string", "index": "not_analyzed"},
-                    "delivered-to": {"type": "string", "index": "not_analyzed"},
-                    "message-id": {"type": "string", "index": "not_analyzed"},
-                    "to": {"type": "string", "index": "not_analyzed"},
-                    "date_ts": {"type": "date"},
+      "mappings": {
+        "properties": {
+            "date_ts": {
+                "type": "date" 
                 },
+            "from": {"type": "text"},
+            "return-path": {"type": "text"},
+            "delivered-to": {"type": "text"},
+            "message-id": {"type": "text"},
+            "to": {"type": "text"},
             }
-        },
-        "refresh": True
+        }
     }
 
     body = json.dumps(schema)
+    print(body)
     url = "%s/%s" % (tornado.options.options.es_url, tornado.options.options.index_name)
     try:
         request = HTTPRequest(url, method="PUT", body=body, request_timeout=240, headers={"Content-Type": "application/json"})
         response = http_client.fetch(request)
         logging.info('Create index done   %s' % response.body)
-    except:
-        pass
+        print('Create index done   %s' %response.body)
+    except Exception as e:
+        print(e)
+        print(request)
 
 
 total_uploaded = 0
@@ -87,10 +84,11 @@ total_uploaded = 0
 def upload_batch(upload_data):
     upload_data_txt = ""
     for item in upload_data:
-        cmd = {'index': {'_index': tornado.options.options.index_name, '_type': 'email', '_id': item['message-id']}}
+        cmd = {'index': {'_index': tornado.options.options.index_name, '_id': item['message-id']}}
         upload_data_txt += json.dumps(cmd) + "\n"
         upload_data_txt += json.dumps(item) + "\n"
-
+       
+    print(upload_data_txt)
     request = HTTPRequest(tornado.options.options.es_url + "/_bulk", method="POST", body=upload_data_txt, request_timeout=240, headers={"Content-Type": "application/json"})
     response = http_client.fetch(request)
     result = json.loads(response.body)
@@ -122,6 +120,9 @@ def convert_msg_to_json(msg):
 
     if "from" in result:
         result['from'] = normalize_email(result['from'])
+
+    if "subject" in result:
+        result['subject'] = str(result['subject'])
 
     if "date" in result:
         try:
